@@ -1,0 +1,452 @@
+---
+title: "N V AJAY_22A_Project 2_Time series analysis"
+output:
+  html_document:
+    df_print: paged
+editor_options:
+  markdown:
+    wrap: 150
+---
+
+This is an [R Markdown](http://rmarkdown.rstudio.com) Notebook. When you execute code within the notebook, the results appear beneath the code. 
+
+This is a R Notebook that does Time Series modelling for the stock '**HDFCBANK**'. The source of data is '*YAHOO FINANCE*'. The time period is
+*'2009-01-01'* to *'2023-12-31'* and periodicity considered is daily.
+
+Try executing this chunk by clicking the *Run* button within the chunk or by placing your cursor inside it and pressing *Ctrl+Shift+Enter*. 
+
+```{r}
+# # Required Packages
+packages = c('quantmod','car','forecast','tseries','FinTS', 'rugarch','utf8','ggplot2')
+# 
+# # Install all Packages with Dependencies
+#install.packages(packages, dependencies = TRUE){install the packages if you dont have it already}
+# 
+# # Load all Packages
+lapply(packages, require, character.only = TRUE)
+
+
+
+getSymbols(Symbols = 'HDFCBANK.NS', 
+           src = 'yahoo', 
+           from = as.Date('2009-01-01'), 
+           to = as.Date('2023-12-31'),
+           periodicity = 'daily')
+
+HDFCBANK_price = na.omit(HDFCBANK.NS$HDFCBANK.NS.Adjusted) # Adjusted Closing Price
+class(HDFCBANK_price) # xts (Time-Series) Object
+plot(HDFCBANK_price)
+class(HDFCBANK_price) # xts (Time-Series) Object
+# Augmented Dickey-Fuller (ADF) Test for Stationarity with HDFCBANK Data
+# *******************************************************************
+
+adf_test_HDFCBANK_P = adf.test(HDFCBANK_price); adf_test_HDFCBANK_P # Inference : HDFCBANK_Price Time-Series is Non-Stationary
+
+```
+Analysis:
+
+**Objective**: To analyze the daily returns of HDFCBANK stock from 2009-01-01 to 2023-12-31.
+
+**Analysis**: Extracted the adjusted closing prices of HDFCBANK stock, performed ADF Test, and visualized them.
+
+**Result**:
+The 'HDFCBANK_price' is not stationary as p-value \> critical value(0.05).
+
+**Implication**: 
+The stock needs to be made stationary using log returns method.
+
+```{r}
+#HDFCBANK_price was not stationary therefore for HDFCBANK_return
+#ADF test for Stationery
+HDFCBANK_return = na.omit(diff(log(HDFCBANK_price))); plot(HDFCBANK_return)
+adf_test_HDFCBANK = adf.test(HDFCBANK_return); adf_test_HDFCBANK
+
+```
+ANalysis:
+
+**Objective**: To conduct an Augmented Dickey-Fuller (ADF) test for stationarity on the daily returns of HDFCBANK stock.
+
+**Analysis**:
+calculated daily returns, and visualized them. Performed the ADF test using the 'adf.test' function and obtained results.
+
+**Result**:
+The Augmented Dickey-Fuller test for stationarity on HDFCBANK daily returns yields the following results:
+
+Dickey-Fuller statistic: -16.03
+Lag order: 15
+p-value: 0.01
+Alternative hypothesis: Stationary
+
+**Implication**:
+The ADF test suggests that the daily returns of HDFCBANK stock are likely stationary. The small p-value (0.01) indicates evidence against the null hypothesis of non-stationarity. Therefore, there is reason to believe that the HDFCBANK stock returns exhibit stationarity, which is important for certain time series analyses.
+
+
+```{r}
+#Autocorrelation test
+# Ljung-Box Test for Autocorrelation
+lb_test_ds_HDFCBANK = Box.test(HDFCBANK_return); lb_test_ds_HDFCBANK
+#If autocorrelation exists then autoARIMA
+
+```
+Analysis:
+
+**Objective**: Performing a Ljung-Box test for autocorrelation on HDFCBANK daily returns.
+
+**Analysis**: Conducted the Ljung-Box test using the 'Box.test' function and obtained results.
+
+**Result**:
+The Ljung-Box test for autocorrelation on HDFCBANK daily returns yields the following results:
+
+X-squared statistic: 5.8852
+Degrees of freedom: 1
+p-value: 0.01527
+
+**Implication**: The Ljung-Box test indicates moderate evidence of autocorrelation in HDFCBANK daily returns. The obtained p-value (0.01527) suggests a significant departure from the null hypothesis of no autocorrelation.
+
+**Action Step**: Given the presence of autocorrelation, it may be advisable to consider an autoARIMA model for time series forecasting. AutoARIMA can automatically select an appropriate ARIMA model with differencing to account for the observed autocorrelation.
+
+
+```{r}
+#ACF and PCF
+
+acf(HDFCBANK_price) # ACF of HDFCBANK Series
+pacf(HDFCBANK_price) # PACF of HDFCBANK Series
+
+acf(HDFCBANK_return) # ACF of HDFCBANK Difference (Stationary) Series
+pacf(HDFCBANK_return) # PACF of HDFCBANK Difference (Stationary) Series
+
+```
+```{r}
+#AutoArima
+arma_pq_ds_H = auto.arima(HDFCBANK_return); arma_pq_ds_H
+arma_pq_H = auto.arima(HDFCBANK_price); arma_pq_H
+
+```
+Analysis:
+
+**Objective**: Perform autoARIMA modeling on HDFCBANK daily returns and adjusted closing prices.
+
+1.1. Daily Returns AutoARIMA Modeling
+
+**Analysis**:
+Utilized the 'auto.arima' function to automatically select the ARIMA model for daily returns.
+
+**Results**:
+For Daily Returns ('HDFCBANK_return'):
+The autoARIMA model suggests an ARIMA(3,0,0) with non-zero mean.
+
+Coefficients: ar1 to ar3, mean
+Sigma^2 (variance): 0.0002362
+Log likelihood: 10189.58
+AIC: -20369.17, AICc: -20369.15, BIC: -20338.09
+1.2. Adjusted Closing Prices AutoARIMA Modeling
+
+**Analysis**:
+Utilized the 'auto.arima' function to automatically select the ARIMA model for adjusted closing prices.
+
+**Results**:
+For Adjusted Closing Prices ('HDFCBANK_price'):
+The autoARIMA model suggests an ARIMA(2,1,2) with drift.
+
+Coefficients: ar1 to ar2, ma1 to ma2, drift
+sigma^2 = 162.4:  log likelihood = -14648.07
+AIC=29308.15   AICc=29308.17   BIC=29345.44
+
+**Implication**:
+The autoARIMA models provide a statistical framework to capture patterns in HDFCBANK daily returns and adjusted closing prices. These models can be used for forecasting future values, and the AIC, AICc, and BIC values help in model comparison.
+
+**ARIMA EQUATION**
+
+The ARIMA(3, 0, 0) model can be represented by the following equation:
+
+Y_t = c + Φ1 Y_(t-1) + Φ2 Y_(t-2) + Φ3 Y_(t-3) + ε_t
+
+where Φ are the autoregressive (AR) coefficients for lags
+Y_t is the actual value at time t.
+c is the constant term (intercept).
+ε_t is the white noise error term at time t
+
+**Difference between Visual Lags from ACF and PACF and Auto arima lags**
+
+For Series HDFCBANK_return
+ACF cuts off after 0 lags
+PACF cuts off after 2 lags
+
+But the order we get from auto arima is p = 3 lags and q = 0 lags
+
+*Note: Interpretation of the coefficients and model selection details may require further analysis based on the specific context of the financial
+data.*
+
+```{r}
+#Arima manuplation
+arma30 = arima(HDFCBANK_return, order = c(3,0,0)); arma30
+ds_fpq_HDFCBANK = forecast(arma30, h = 500)
+plot(ds_fpq_HDFCBANK)
+```
+Analysis:
+
+2. ARIMA(3, 0, 0) Model and Forecast
+
+**Objective**: Fit an ARIMA(3, 0, 0) model to HDFCBANK daily returns and generate forecasts.
+
+2.1. ARIMA(3, 0, 0) Model
+
+**Analysis**:
+Utilized the 'arima' function to fit the ARIMA model.
+
+**Results**:
+ARIMA Model (3, 0, 0) Coefficients:
+
+AR: ar1 to ar3
+Intercept term
+Sigma^2 (variance) estimated as 0.000236
+Log likelihood: 10189.58
+AIC: -20369.17
+2.2. Forecasting
+
+**Forecasting**:
+Generated forecasts for the next 500 time points using the fitted ARIMA(3, 0, 0) model.
+
+**Plot**:
+The plot displays the original time series of daily returns along with the forecasted values.
+
+**Implication**:
+The ARIMA(3, 0, 0) model provides insights into the historical patterns of HDFCBANK daily returns. The generated forecasts can be valuable for future predictions, and the plot visually represents the model's performance.
+
+*Note: Interpretation of coefficients and model evaluation details may require further analysis based on the specific context of the financial data.*
+
+```{r}
+#Autocorrelation test
+# Ljung-Box Test for Autocorrelation
+lb_test_ds_AR = Box.test(arma30$residuals); lb_test_ds_AR
+#After this no autocorrelation exists
+
+```
+Analysis:
+
+3. Ljung-Box Test Results
+
+**Objective**: Assess autocorrelation in the residuals of the ARIMA(3, 0, 0) model.
+
+3.1. Ljung-Box Test Statistics
+
+**Analysis**:
+Conducted the Ljung-Box test using the 'Box.test' function on the residuals.
+
+**Results**:
+
+X-squared statistic: 0.00070386
+Degrees of freedom: 1
+p-value: 0.9788
+
+3.2. **Implication**
+The Ljung-Box test suggests no significant autocorrelation in the residuals of the ARIMA(3, 0, 0) model. The high p-value (0.9788) indicates no evidence against the null hypothesis of no autocorrelation.
+
+3.3. **Action**
+The absence of autocorrelation in residuals is a positive outcome, suggesting that the ARIMA model adequately captures the temporal patterns in the time series.
+
+*Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.*
+
+```{r}
+# Test for Volatility Clustering or Heteroskedasticity: Box Test 
+stk_ret_sqr = arma30$residuals^2 # Return Variance (Since Mean Returns is approx. 0)
+plot(stk_ret_sqr)
+stk_ret_sqr_box_test = Box.test(stk_ret_sqr, lag = 10) # H0: Return Variance Series is Not Serially Correlated
+stk_ret_sqr_box_test # Inference : Return Variance Series is Heteroskedastic (Has Volatility Clustering)
+
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+stk_ret_arch_testH = ArchTest(arma30$residuals, lags = 10) # H0: No ARCH Effects
+stk_ret_arch_testH # Inference : Return Series is Heteroskedastic (Has Volatility Clustering)
+
+```
+
+Analysis:
+
+4. Volatility Clustering Tests
+
+**Objective**: Assess the presence of volatility clustering or heteroskedasticity in the residuals of the ARIMA(3, 0, 0) model.
+
+**Analysis**: Conducted Box test and ARCH test on the squared residuals to assess the presence of volatility clustering.
+
+4.1. Box Test for Volatility Clustering
+
+X-squared Statistic: 1049
+Degrees of Freedom: 10
+p-value: < 2.2e-16
+
+**Results and Inference**:
+
+ [*The Box test indicates significant evidence against the null hypothesis, suggesting that the return variance series exhibits volatility
+        clustering or heteroskedasticity.*]{.underline}
+
+4.2. ARCH Test for Volatility Clustering
+
+Chi-squared Statistic: 519.1
+Degrees of Freedom: 10
+p-value: < 2.2e-16
+
+**Results and Inference**:
+[*The ARCH test provides strong evidence against the null hypothesis. It supporting the presence of ARCH effects in the return series*. *This
+        implies that the returns have volatility clustering as per the ARCH Test.*]{.underline}
+
+4.3. **Implication**
+The results from both tests suggest that the residuals of the ARIMA(3, 0, 0) model exhibit significant volatility clustering or heteroskedasticity. Understanding and accounting for this pattern in volatility is essential for risk management and forecasting. Hence, we proceed with Residual modelling assuming Heteroskedasticity.
+
+*Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.*
+
+
+```{r}
+#Garch model
+garch_model1H = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(0,0), include.mean = TRUE))
+nse_ret_garch1H = ugarchfit(garch_model1H, data = arma30$residuals)
+nse_ret_garch1H
+
+garch_model2H = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(3,0), include.mean = FALSE))
+nse_ret_garch2H = ugarchfit(garch_model2H, data = arma30$residuals)
+nse_ret_garch2H
+
+# Test for Volatility Clustering or Heteroskedasticity: ARCH Test
+gar_resdH = residuals(nse_ret_garch2H)^2
+stk_ret_arch_test1H = ArchTest(gar_resdH, lags = 1) # H0: No ARCH Effects
+stk_ret_arch_test1H # Inference : Return Series(residuals) is not Heteroskedastic
+# Extract coefficients
+coefficients_garch2H <- coef(nse_ret_garch2H)
+print(coefficients_garch2H)
+
+# Extract other information
+fitted_values <- fitted(nse_ret_garch2H); fitted_values
+
+```
+
+Analysis:
+
+**Objective**: To fit GARCH models to the residuals of the ARIMA(3, 0, 0) model and test for volatility clustering.
+
+**Analysis**: Fitted two GARCH models ('garch_model1H' and 'garch_model2H') to the residuals and performed an ARCH test on squared residuals.
+
+**Results:**:
+
+GARCH Model 1:
+
+sGARCH(1,1) model with ARIMA(0,0,0) mean.
+Optimal Parameters:
+Mean (mu): 0.000022
+Omega: 0.000003
+Alpha1: 0.057278
+Beta1: 0.927783
+Log likelihood: 10612.34
+Weighted Ljung-Box Test on Standardized Residuals and Squared Residuals show no significant autocorrelation.
+Weighted ARCH LM Tests indicate no evidence of ARCH effects.
+
+GARCH Model 2:
+
+sGARCH(1,1) model with ARFIMA(3,0,0) mean.
+Optimal Parameters:
+Mean (mu): 0.000022
+Omega: 0.000003
+Alpha1: 0.054424
+Beta1: 0.931082
+Log likelihood: 10606.29
+Weighted Ljung-Box Test and Weighted ARCH LM Tests show no evidence of autocorrelation and ARCH effects.
+
+ Based on the provided GARCH model outputs, the second model (sGARCH(1,1) with ARFIMA(3,0,0) mean model) appears to be better than the first model
+    (sGARCH(1,1) with ARFIMA(0,0,0) mean model) for the following reasons:
+
+    -   **Lower Information Criteria:** All information criteria (Akaike, Bayes, Shibata, Hannan-Quinn) are lower for the second model compared to the
+        first model. Lower information criteria also indicate a better fit.
+
+    -   **Ljung-Box Tests:** Both models don't show any significant serial correlation in the standardized residuals or squared residuals, based on
+        the p-values of the Ljung-Box tests.
+
+    -   **ARCH LM Tests:** neither model shows significant ARCH effects
+
+  -   Therefore, considering the lower information criteria, and similar performance in other tests, the second model (sGARCH(1,1)
+    with ARFIMA(3,0,0) mean model) can be considered a better fit for the data compared to the first model.
+    
+ *Note: It's important to note that selecting the best GARCH model often involves a combination of various factors, and the choice may depend on
+    the specific research question and desired level of complexity.*
+
+**Implication**:
+Both GARCH models suggest that the residuals do not exhibit significant volatility clustering.
+
+
+```{r}
+
+garcH_modelf = ugarchspec(variance.model = list(model = 'sGARCH', garchOrder = c(1,1)), mean.model = list(armaOrder = c(3,0), include.mean = FALSE))
+stk_ret_garcH = ugarchfit(garcH_modelf, data = HDFCBANK_return); stk_ret_garcH
+```
+Analysis:
+
+**Objective**: To fit a GARCH model to the daily returns of HDFCBANK stock and assess the goodness-of-fit using the Adjusted Pearson Goodness-of-Fit Test.
+
+**Analysis**: Used the 'ugarchspec' and 'ugarchfit' functions to fit a GARCH model and performed the Adjusted Pearson Goodness-of-Fit Test.
+
+**Results**:
+
+GARCH Model:
+
+sGARCH(1,1) model with ARFIMA(3,0,0) mean.
+Optimal Parameters:
+ar1: 0.051579
+ar2: -0.053232
+ar3: 0.003477
+omega: 0.000003
+alpha1: 0.053977
+beta1: 0.931343
+Log likelihood: 10596
+Weighted Ljung-Box Test on Standardized Residuals and Squared Residuals show no significant autocorrelation.
+Weighted ARCH LM Tests indicate no evidence of ARCH effects.
+
+Adjusted Pearson Goodness-of-Fit Test:
+
+The test was performed for different group sizes (20, 30, 40, and 50).
+For each group size, the test statistic and p-value were calculated.
+All p-values are extremely low (e.g., 7.661e-12), indicating strong evidence against the null hypothesis of a good fit.
+
+**Implication**: The Adjusted Pearson Goodness-of-Fit Test suggests that the fitted GARCH model may not provide a good fit to the observed daily
+returns of HDFCBANK stock. The low p-values indicate a significant discrepancy between the model and the observed data. However, these observations alone
+don't necessarily translate to the model being a bad fit. Here's why:
+
+1.  **Sensitivity to sample size:** As mentioned earlier, the Pearson test is sensitive to sample size. With a large dataset, even minor deviations
+    from the expected distribution can lead to very low p-values, making it unreliable for assessing GARCH model fit.
+
+2.  **Limited scope:** The Pearson test focuses on discrepancies in **categorical data**, not capturing the model's ability to address core aspects of
+    GARCH models, such as:
+
+    -   **Capturing volatility dynamics:** This is assessed by tests like the Ljung-Box test on standardized residuals, which shows no significant
+        serial correlation in this case.
+
+    -   **Accounting for ARCH effects:** The ARCH LM tests show no significant ARCH effects at various lags, indicating the model adequately accounts
+        for heteroscedasticity.
+
+*Note: Interpretation may vary based on the specific context of the financial data and the assumptions underlying the time series analysis.*
+
+```{r}
+# GARCH Forecast
+stk_ret_garch_forecast1h = ugarchforecast(stk_ret_garcH, n.ahead = 50); stk_ret_garch_forecast1h
+```
+Analysis:
+
+**Objective**: To forecast volatility using the fitted GARCH model for the next 50 time points.
+
+**Analysis**: Used the 'ugarchforecast' function to generate volatility forecasts for the next 50 time points.
+
+**Results**:
+
+GARCH Model Forecast:
+
+Model: sGARCH
+Horizon: 50
+Roll Steps: 0
+Out of Sample: 0
+0-roll forecast [T0=2023-12-29]:
+
+Forecasted Series (Sigma) for the next 50 time points:
+T+1 to T+50: Contain forecasted values of volatility.
+
+**Implication**:
+The forecasted values represent the predicted volatility for the next 50 time points based on the fitted GARCH model. These forecasts can be valuable for risk management, helping to anticipate and plan for potential changes in volatility in the financial time series.
+
+```{r}
+plot(stk_ret_garch_forecast1h)
+```
